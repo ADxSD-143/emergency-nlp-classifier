@@ -57,7 +57,7 @@ That means we select the class with the highest predicted probability.
 
 ## 3. Initial Classes
 
-The first version will use six incident categories:
+The first version will use **seven** incident categories:
 
 | Class | Example |
 |---|---|
@@ -67,10 +67,31 @@ The first version will use six incident categories:
 | Medical Emergency | A person collapsed and needs an ambulance |
 | Crime | Robbery reported near the ATM |
 | Earthquake | Strong shaking felt across the city |
+| UNDEFINED | My uncle is playing with her girl in bed |
 
-A future version may add more classes if the dataset and experiments justify them.
+### Why `UNDEFINED` exists
 
----
+Real-time systems will inevitably receive text that is:
+
+- unrelated to an emergency
+- outside our supported incident taxonomy
+- too ambiguous to classify safely
+- casual/personal conversation
+- malformed or insufficiently informative
+
+Such input should not be forced into an emergency category.
+
+For example:
+
+> My uncle is playing with her girl in bed.
+
+This does not provide evidence for any of our defined emergency classes, so the desired output is:
+
+`UNDEFINED`
+
+This is an important design decision: **the classifier must have a way to say "none of the known classes."**
+
+A future version may add more incident categories if the dataset and experiments justify them.
 
 ## 4. Why This Is an NLP Problem
 
