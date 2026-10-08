@@ -65,20 +65,66 @@ The canonical dataset will eventually use fields similar to:
 | report_id | string | Unique sample identifier |
 | text | string | Original report |
 | label | categorical | Ground-truth incident class |
-| source | string | Dataset/source provenance |
-| event_id | string | Crisis/event grouping |
-| language | string | Language of the report |
+| source | string/null | Dataset/source provenance |
+| event_id | string/null | Crisis/event grouping when available |
+| language | string/null | Language of the report when available |
 | timestamp | datetime/null | Original report time if available |
-| location | string/null | Location metadata if available |
+| latitude | float/null | GPS latitude when available |
+| longitude | float/null | GPS longitude when available |
+| location | string/null | Human-readable location metadata if available |
 | annotator_note | string/null | Reason for difficult labels |
 
 Not every field will be used as a model feature.
 
 For the first classifier, the primary input is text and the target is label.
 
-Metadata such as event_id, timestamp, and source are primarily useful for analysis, splitting, provenance, and future extensions.
+The first classifier uses text as its primary input. Metadata such as source, language, event_id, timestamp, and GPS/location are retained for provenance, auditing, event-aware splitting, and future system components; they are not automatically treated as NLP features.
 
-## 5. Provenance
+## 5. Source and Language Metadata
+
+source and language are not required as inputs to the first classifier.
+
+We keep them because:
+- source tells us where a sample came from and helps audit provenance and annotation differences
+- language helps us understand multilingual coverage and language-specific behavior
+- source/language-wise evaluation may become useful later
+
+They are metadata, not mandatory model features.
+
+## 6. GPS, Location and Timestamp
+
+GPS/location and timestamp should be retained when available, but not fed into the first text-only NLP classifier.
+
+The first classifier answers:
+
+    What type of incident does this report describe?
+
+Future components can instead ask:
+
+    Are several reports describing the same incident?
+    How geographically concentrated are the reports?
+    Are the reports happening within the same time window?
+    How many independent reports support this incident?
+
+For example:
+
+    5 reports
+    ↓
+    within 500 m
+    ↓
+    within 10 minutes
+    ↓
+    same predicted incident type
+    ↓
+    stronger evidence for one incident
+
+This is a future geo-temporal aggregation / incident intelligence problem.
+
+Multiple reports from the same location are NOT automatically data leakage. Different reports can provide useful linguistic variation.
+
+The main leakage concern is overlap from the same event across training and evaluation data.
+
+## 7. Provenance
 
 Every real dataset sample should retain information about where it came from.
 
@@ -161,7 +207,7 @@ Evidence of seismic activity or an earthquake event.
 
 Text that does not provide sufficient evidence for one supported class or is outside the supported taxonomy.
 
-## 9. Data Leakage
+## 10. Data Leakage
 
 Data leakage is one of the biggest risks in this project.
 
@@ -181,7 +227,7 @@ Therefore:
 
 > We must check duplicates before splitting and consider event-aware splitting when event identifiers are available.
 
-## 10. Train / Validation / Test
+## 11. Train / Validation / Test
 
 We will eventually use:
 
@@ -197,7 +243,7 @@ The exact split will depend on dataset size and event structure.
 
 If event IDs are available, an event-aware split may be preferable so that reports from the same crisis event do not leak across train and test.
 
-## 11. Class Balance
+## 12. Class Balance
 
 We will inspect class counts before training.
 
@@ -212,7 +258,7 @@ We will therefore report:
 - weighted F1
 - confusion matrix
 
-## 12. UNDEFINED Is Also a Data Challenge
+## 13. UNDEFINED Is Also a Data Challenge
 
 Adding UNDEFINED does not automatically solve out-of-domain detection.
 
@@ -235,7 +281,7 @@ We will therefore include diverse UNDEFINED examples:
 
 The class should represent the boundary of our taxonomy, not simply random text.
 
-## 13. Duplicate Detection
+## 14. Duplicate Detection
 
 Before model training we will investigate:
 
@@ -249,7 +295,7 @@ Duplicates can inflate evaluation scores and make the model appear better than i
 
 We will document the deduplication method and how many samples were removed.
 
-## 14. Dataset Quality Checklist
+## 15. Dataset Quality Checklist
 
 Before training:
 
@@ -267,7 +313,7 @@ Before training:
 - [ ] Leakage risks checked
 - [ ] Test set isolated
 
-## 15. Research Findings Relevant to Our Design
+## 16. Research Findings Relevant to Our Design
 
 CrisisBench consolidated multiple crisis datasets and explicitly performed label mapping, filtering, and duplicate handling. This is a useful precedent for our own data pipeline.
 
@@ -275,7 +321,7 @@ Other crisis NLP work also shows that duplicate removal and overlap checks are i
 
 A 2026 disaster corpus combines India and Nepal crisis posts and describes the data as noisy social-media text, reinforcing that realistic crisis NLP data differs substantially from clean textbook sentences.
 
-## 16. Design Decisions
+## 17. Design Decisions
 
 ### Decision D1
 
@@ -307,7 +353,25 @@ Separate controlled learning data from real-world benchmark data.
 
 Reason: learning experiments should not be confused with evidence of real-world performance.
 
-## 17. Current Status
+### Decision D6
+
+Keep GPS/location/timestamp as incident metadata, not first-stage NLP features.
+
+Reason: the initial model should establish text-based classification performance independently. These signals can later power incident clustering, credibility, and priority.
+
+### Decision D7
+
+Do not remove multiple reports merely because they come from the same location.
+
+Reason: same location does not imply same event, and multiple linguistic descriptions can be valuable. Leakage control should focus on duplicate/near-duplicate samples and event overlap across evaluation splits.
+
+### Decision D8
+
+Prioritize a large, diverse, high-quality real dataset before serious model training.
+
+Reason: dataset quality and coverage are likely to be a larger bottleneck than model complexity at this stage.
+
+## 18. Current Status
 
 Completed: Dataset design specification
 
@@ -315,7 +379,7 @@ Next: Dataset acquisition and inspection
 
 The next step is NOT model training.
 
-We first inspect candidate datasets for:
+We first inspect our current dataset and candidate external datasets for:
 
 - format
 - language
@@ -327,3 +391,6 @@ We first inspect candidate datasets for:
 - train/validation/test availability
 - licensing/provenance
 - compatibility with our seven-class taxonomy
+- dataset diversity
+
+Then we will decide whether the current dataset should be retained, used only for learning/EDA, combined with other datasets, or discarded in favor of better data.
